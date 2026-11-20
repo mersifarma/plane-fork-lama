@@ -1,0 +1,17 @@
+# Added by deploy.sh when PGHOST in plane.env points at a separate database (deployments/db),
+# so the bundled plane-db never starts and nothing waits on it.
+services:
+  plane-db:
+    profiles: [bundled-db]
+
+  api:
+    depends_on: !override [plane-redis, plane-mq]
+
+  worker:
+    depends_on: !override [api, plane-redis, plane-mq]
+
+  beat-worker:
+    depends_on: !override [api, plane-redis, plane-mq]
+
+  migrator:
+    depends_on: !override [plane-redis]
