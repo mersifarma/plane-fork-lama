@@ -22,10 +22,14 @@ if [ ! -f "$ENV_FILE" ]; then
   setenv LIVE_SERVER_SECRET_KEY "$(rand 50)"
   setenv AWS_ACCESS_KEY_ID "$(rand 20)"
   setenv AWS_SECRET_ACCESS_KEY "$(rand 40)"
+  setenv LISTEN_HTTP_PORT 2028
+  # browsers drop :80 from Origin, so if LISTEN_HTTP_PORT becomes 80, drop the :port from these two
+  setenv WEB_URL 'http://${APP_DOMAIN}:${LISTEN_HTTP_PORT}'
+  setenv CORS_ALLOWED_ORIGINS 'http://${APP_DOMAIN}:${LISTEN_HTTP_PORT}'
   cat << EOF
 Created $ENV_FILE with fresh secrets. Edit it, then run 'bash deploy.sh' again:
-  APP_DOMAIN          domain or IP users open in the browser (add :PORT if LISTEN_HTTP_PORT is not 80)
-  LISTEN_HTTP_PORT    host port for the web UI (default 80)
+  APP_DOMAIN          domain or IP users open in the browser, without port
+  LISTEN_HTTP_PORT    host port for the web UI (set to 2028)
   Own MinIO / S3:     USE_MINIO=0, AWS_S3_ENDPOINT_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET_NAME
                       (the endpoint must be reachable from this server AND from users' browsers)
 EOF
@@ -44,4 +48,4 @@ curl -fs -o /dev/null "$URL" || { echo "Plane did not come up. Check: docker com
 
 echo "Object storage check:"
 compose exec -T api python manage.py create_bucket
-echo "Plane is up: http://$(getenv APP_DOMAIN)  (first time: open /god-mode/ to create the admin)"
+echo "Plane is up: http://$(getenv APP_DOMAIN):${PORT:-80}  (first time: open /god-mode/ to create the admin)"
