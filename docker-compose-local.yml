@@ -1,3 +1,10 @@
+# object-storage creds live only in the root .env (shared with plane-minio below)
+x-storage-env: &storage-env
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
+  AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL}
+
 services:
   plane-redis:
     image: valkey/valkey:7.2.11-alpine
@@ -77,6 +84,7 @@ services:
     command: ./bin/docker-entrypoint-api-local.sh
     env_file:
       - ./apps/api/.env
+    environment: *storage-env
     depends_on:
       - plane-db
       - plane-redis
@@ -98,6 +106,7 @@ services:
     command: ./bin/docker-entrypoint-worker.sh
     env_file:
       - ./apps/api/.env
+    environment: *storage-env
     depends_on:
       - api
       - plane-db
@@ -117,6 +126,7 @@ services:
     command: ./bin/docker-entrypoint-beat.sh
     env_file:
       - ./apps/api/.env
+    environment: *storage-env
     depends_on:
       - api
       - plane-db
@@ -136,6 +146,7 @@ services:
     command: ./bin/docker-entrypoint-migrator.sh --settings=plane.settings.local
     env_file:
       - ./apps/api/.env
+    environment: *storage-env
     depends_on:
       - plane-db
       - plane-redis
