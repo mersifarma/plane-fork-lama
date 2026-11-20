@@ -25,13 +25,14 @@ import { FormHeader } from "./form-header";
 import { useCsrfToken } from "@/hooks/use-csrf-token";
 
 // error codes
+// numeric codes the API sends back in `error_code` (see AUTHENTICATION_ERROR_CODES in the API)
 enum EErrorCodes {
-  INSTANCE_NOT_CONFIGURED = "INSTANCE_NOT_CONFIGURED",
-  ADMIN_ALREADY_EXIST = "ADMIN_ALREADY_EXIST",
-  REQUIRED_EMAIL_PASSWORD_FIRST_NAME = "REQUIRED_EMAIL_PASSWORD_FIRST_NAME",
-  INVALID_EMAIL = "INVALID_EMAIL",
-  INVALID_PASSWORD = "INVALID_PASSWORD",
-  USER_ALREADY_EXISTS = "USER_ALREADY_EXISTS",
+  INSTANCE_NOT_CONFIGURED = "5000",
+  ADMIN_ALREADY_EXIST = "5150",
+  REQUIRED_EMAIL_PASSWORD_FIRST_NAME = "5155",
+  INVALID_EMAIL = "5160",
+  INVALID_PASSWORD = "5021", // PASSWORD_TOO_WEAK
+  USER_ALREADY_EXISTS = "5180",
 }
 
 type TError = {
@@ -99,24 +100,30 @@ export function InstanceSetupForm() {
 
   // derived values
   const errorData: TError = useMemo(() => {
-    if (errorCode && errorMessage) {
-      switch (errorCode) {
-        case EErrorCodes.INSTANCE_NOT_CONFIGURED:
-          return { type: EErrorCodes.INSTANCE_NOT_CONFIGURED, message: errorMessage };
-        case EErrorCodes.ADMIN_ALREADY_EXIST:
-          return { type: EErrorCodes.ADMIN_ALREADY_EXIST, message: errorMessage };
-        case EErrorCodes.REQUIRED_EMAIL_PASSWORD_FIRST_NAME:
-          return { type: EErrorCodes.REQUIRED_EMAIL_PASSWORD_FIRST_NAME, message: errorMessage };
-        case EErrorCodes.INVALID_EMAIL:
-          return { type: EErrorCodes.INVALID_EMAIL, message: errorMessage };
-        case EErrorCodes.INVALID_PASSWORD:
-          return { type: EErrorCodes.INVALID_PASSWORD, message: errorMessage };
-        case EErrorCodes.USER_ALREADY_EXISTS:
-          return { type: EErrorCodes.USER_ALREADY_EXISTS, message: errorMessage };
-        default:
-          return { type: undefined, message: undefined };
-      }
-    } else return { type: undefined, message: undefined };
+    if (!errorCode) return { type: undefined, message: undefined };
+    switch (errorCode) {
+      case EErrorCodes.INSTANCE_NOT_CONFIGURED:
+        return { type: EErrorCodes.INSTANCE_NOT_CONFIGURED, message: "Instance is not configured. Please try again." };
+      case EErrorCodes.ADMIN_ALREADY_EXIST:
+        return { type: EErrorCodes.ADMIN_ALREADY_EXIST, message: "Admin already exists. Please sign in." };
+      case EErrorCodes.REQUIRED_EMAIL_PASSWORD_FIRST_NAME:
+        return {
+          type: EErrorCodes.REQUIRED_EMAIL_PASSWORD_FIRST_NAME,
+          message: "Email, password and first name are required.",
+        };
+      case EErrorCodes.INVALID_EMAIL:
+        return { type: EErrorCodes.INVALID_EMAIL, message: "Invalid email address." };
+      case EErrorCodes.INVALID_PASSWORD:
+        return {
+          type: EErrorCodes.INVALID_PASSWORD,
+          message: "Password is too weak. Use a longer, less predictable password.",
+        };
+      case EErrorCodes.USER_ALREADY_EXISTS:
+        return { type: EErrorCodes.USER_ALREADY_EXISTS, message: "A user with this email already exists." };
+      default:
+        // unmapped codes (e.g. rate limit) still get a visible error instead of a silent reload
+        return { type: undefined, message: errorMessage ?? "Something went wrong. Please try again." };
+    }
   }, [errorCode, errorMessage]);
 
   const isButtonDisabled = useMemo(
@@ -144,9 +151,9 @@ export function InstanceSetupForm() {
             heading="Setup your Plane Instance"
             subHeading="Post setup you will be able to manage this Plane instance."
           />
-          {errorData.type &&
-            errorData?.message &&
-            ![EErrorCodes.INVALID_EMAIL, EErrorCodes.INVALID_PASSWORD].includes(errorData.type) && (
+          {errorData.message &&
+            errorData.type !== EErrorCodes.INVALID_EMAIL &&
+            errorData.type !== EErrorCodes.INVALID_PASSWORD && (
               <Banner placement="inline" variant="danger" description={errorData?.message} />
             )}
           <form
