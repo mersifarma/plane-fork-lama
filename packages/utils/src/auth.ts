@@ -24,25 +24,8 @@ export enum PasswordStrength {
  * Calculate password strength based on various criteria
  */
 export const getPasswordStrength = (password: string): E_PASSWORD_STRENGTH => {
-  if (!password || password === "" || password.length <= 0) {
-    return E_PASSWORD_STRENGTH.EMPTY;
-  }
-
-  if (password.length < 8) {
-    return E_PASSWORD_STRENGTH.LENGTH_NOT_VALID;
-  }
-
-  // Check all criteria
-  const hasUpperCase = /[A-Z]/.test(password);
-  const hasLowerCase = /[a-z]/.test(password);
-  const hasDigit = /[0-9]/.test(password);
-  const hasSpecialChar = /[!@#$%^&*()\-_+=\[\]{}|;:'",.<>?/]/.test(password);
-
-  if (hasUpperCase && hasLowerCase && hasDigit && hasSpecialChar) {
-    return E_PASSWORD_STRENGTH.STRENGTH_VALID;
-  }
-
-  return E_PASSWORD_STRENGTH.STRENGTH_NOT_VALID;
+  // ponytail: strength rules removed on request, any non-empty password is valid
+  return password ? E_PASSWORD_STRENGTH.STRENGTH_VALID : E_PASSWORD_STRENGTH.EMPTY;
 };
 
 export type PasswordCriteria = {
@@ -78,7 +61,7 @@ export const getPasswordCriteria = (password: string): PasswordCriteria[] => [
   {
     key: "special",
     label: "Min 1 special character",
-    isValid: /[!@#$%^&*()\-_+=\[\]{}|;:'",.<>?/]/.test(password),
+    isValid: /[!@#$%^&*()\-_+=[\]{}|;:'",.<>?/]/.test(password),
   },
 ];
 
