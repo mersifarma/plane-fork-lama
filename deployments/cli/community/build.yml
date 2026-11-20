@@ -34,3 +34,13 @@ services:
     build:
       context: ../../apps/proxy
       dockerfile: Dockerfile.ce
+
+  # same backend image as api, so they run this checkout's code instead of pulling makeplane/plane-backend
+  worker:
+    image: ${DOCKERHUB_USER:-local}/plane-backend:${APP_RELEASE:-latest}
+
+  beat-worker:
+    image: ${DOCKERHUB_USER:-local}/plane-backend:${APP_RELEASE:-latest}
+
+  migrator:
+    image: ${DOCKERHUB_USER:-local}/plane-backend:${APP_RELEASE:-latest}
