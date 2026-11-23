@@ -23,7 +23,7 @@ docker compose version > /dev/null 2>&1 || { echo "Docker with the compose plugi
 
 if [ "${1:-}" = db ]; then
   if [ ! -f db.env ]; then
-    printf '%s\n' "POSTGRES_USER=plane" "POSTGRES_PASSWORD=$(rand 32)" "POSTGRES_DB=plane" "POSTGRES_PORT=5432" \
+    printf '%s\n' "POSTGRES_USER=plane" "POSTGRES_PASSWORD=$(rand 32)" "POSTGRES_DB=plane" "POSTGRES_PORT=5341" \
       "# address to listen on; a private IP keeps the database off the public internet" "DB_BIND=0.0.0.0" > db.env
     echo "Created db.env with a fresh password."
   fi
