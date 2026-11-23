@@ -4,6 +4,7 @@
 
 # Django imports
 from django.conf import settings
+from django.core.exceptions import DisallowedHost
 from django.http import HttpRequest
 
 # Third party imports
@@ -21,7 +22,7 @@ def base_host(
 ) -> str:
     """Utility function to return host / origin from the request"""
     # Calculate the base origin from request
-    base_origin = settings.WEB_URL or settings.APP_BASE_URL
+    base_origin = request_origin(request) or settings.WEB_URL or settings.APP_BASE_URL
 
     # Admin redirection
     if is_admin:
@@ -61,6 +62,24 @@ def base_host(
             return base_origin
 
     return base_origin
+
+
+def request_origin(request: Request | HttpRequest | None) -> str | None:
+    """
+    The origin the request came in on, when it is one of CORS_ALLOWED_ORIGINS.
+
+    Lets one instance serve several addresses at once (e.g. http on the LAN and
+    https through a tunnel) and send users back to the address they used. Only
+    configured origins qualify, so a forged Host header can't steer redirects.
+    """
+    if request is None:  # some callers (e.g. the admin auth throttle) have no request
+        return None
+    try:
+        origin = f"{request.scheme}://{request.get_host()}".lower()
+    except DisallowedHost:
+        return None
+    allowed = {o.strip().rstrip("/").lower() for o in settings.CORS_ALLOWED_ORIGINS}
+    return origin if origin in allowed else None
 
 
 def user_ip(request: Request | HttpRequest) -> str:

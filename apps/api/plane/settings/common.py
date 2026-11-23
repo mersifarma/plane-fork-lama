@@ -120,6 +120,8 @@ INSTALLED_APPS = [
 
 # Middlewares
 MIDDLEWARE = [
+    # first, so it sees the cookies every other middleware sets on the way out
+    "plane.middleware.secure_cookies.SecureCookiesPerRequestMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
