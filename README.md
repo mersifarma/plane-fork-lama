@@ -1,167 +1,137 @@
-<br /><br />
+# Plane (internal)
 
-<p align="center">
-<a href="https://plane.so">
-  <img src="https://media.docs.plane.so/logo/plane_github_readme.png" alt="Plane Logo" width="400">
-</a>
-</p>
-<p align="center"><b>Modern project management for all teams</b></p>
+Fork internal dari [Plane](https://github.com/makeplane/plane) untuk project management tim. Isinya Plane Community Edition ditambah beberapa penyesuaian (lihat [Perbedaan dari upstream](#perbedaan-dari-upstream)), dengan deploy yang membangun semua image langsung dari repo ini.
 
-<p align="center">
-    <a href="https://plane.so/"><b>Website</b></a> •
-    <a href="https://forum.plane.so"><b>Forum</b></a> •
-    <a href="https://x.com/planepowers"><b>X</b></a> •
-    <a href="https://docs.plane.so/"><b>Documentation</b></a>
-</p>
+> **Repo ini publik.** Jangan commit password, token, IP internal, atau data (export ClickUp, backup). Nilai sebenarnya hanya ada di `plane.env` / `db.env` di server. `data/`, `plane.env`, dan `db.env` sudah ada di `.gitignore`.
 
-<p>
-    <a href="https://app.plane.so/#gh-light-mode-only" target="_blank">
-      <img
-        src="https://media.docs.plane.so/GitHub-readme/github-top.webp"
-        alt="Plane Screens"
-        width="100%"
-      />
-    </a>
-</p>
+## Akses
 
-Meet [Plane](https://plane.so/), an open-source project management tool to track issues, run ~sprints~ cycles, and manage product roadmaps without the chaos of managing the tool itself. 🧘‍♀️
+| Dari       | Alamat                          | Catatan                                                                |
+| ---------- | ------------------------------- | ---------------------------------------------------------------------- |
+| Internet   | `https://<APP_DOMAIN>`          | Lewat Cloudflare Tunnel, HTTPS diurus Cloudflare                       |
+| LAN kantor | `http://<APP_LAN_ADDRESS>:2028` | Tetap jalan tanpa internet (Plane, database, dan file semuanya di LAN) |
 
-> Plane is evolving every day. Your suggestions, ideas, and reported bugs help us immensely. Do not hesitate to join in the conversation on [Forum](https://forum.plane.so) or raise a GitHub issue. We read everything and respond to most.
+- Login di tiap alamat terpisah: masuk sekali lewat domain dan sekali lewat LAN.
+- Pengaturan instance (admin): `/god-mode/`.
+- File (lampiran, avatar) ikut alamat yang sedang dibuka, jadi tidak perlu domain terpisah untuk storage.
 
-## 🚀 Installation
+## Akun tim
 
-Getting started with Plane is simple. Choose the setup that works best for you:
+1. Admin mengundang email anggota: **Workspace settings → Members → Invite**. Email undangan tidak terkirim (SMTP belum diatur), jadi kabari orangnya langsung.
+2. Anggota mendaftar dengan **email yang sama**, lalu menerima undangan yang muncul di akunnya.
+3. Admin memasukkan anggota ke project: **Project settings → Members**.
+4. Setelah semua masuk, matikan **"Allow anyone to sign up"** di `/god-mode/` → Authentication. Email yang sudah diundang tetap bisa mendaftar.
 
-- **Plane Cloud**
-  Sign up for a free account on [Plane Cloud](https://app.plane.so)—it's the fastest way to get up and running without worrying about infrastructure.
+Tidak ada aturan kekuatan password (sengaja dihapus), jadi minta tim memakai password yang kuat. Reset password lewat email belum bisa selama SMTP belum diatur.
 
-- **Self-host Plane**
-  Prefer full control over your data and infrastructure? Install and run Plane on your own servers. Follow our detailed [deployment guides](https://developers.plane.so/self-hosting/overview) to get started.
+## Perbedaan dari upstream
 
-| Installation methods | Docs link                                                                                                                                                                               |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Docker               | [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://developers.plane.so/self-hosting/methods/docker-compose)         |
-| Kubernetes           | [![Kubernetes](https://img.shields.io/badge/kubernetes-%23326ce5.svg?style=for-the-badge&logo=kubernetes&logoColor=white)](https://developers.plane.so/self-hosting/methods/kubernetes) |
-| All-in-one Docker    | [deployments/aio/community](./deployments/aio/community/README.md) · [docs](https://developers.plane.so/self-hosting/methods/docker-aio)                                                |
+- **Tanpa validasi kekuatan password**: password apa pun diterima asal tidak kosong (`is_password_strong` di API, `getPasswordStrength` di `@plane/utils`).
+- **Akses hybrid LAN + domain**: redirect setelah login kembali ke alamat yang dipakai, selama alamat itu ada di `CORS_ALLOWED_ORIGINS` (`apps/api/plane/authentication/utils/host.py`). Cookie diberi flag Secure hanya untuk request HTTPS (`apps/api/plane/middleware/secure_cookies.py`).
+- **File lewat proxy ke MinIO sendiri**: proxy meneruskan `/<bucket>/*` ke `MINIO_UPSTREAM` (diisi dari `AWS_S3_ENDPOINT_URL`).
+- **Form setup admin** menampilkan pesan error (sebelumnya diam saja).
+- **Deploy dari source** lewat `deploy.sh`, dengan database bisa dijalankan sebagai stack terpisah.
 
-`Instance admins` can configure instance settings with [God mode](https://developers.plane.so/self-hosting/govern/instance-admin).
+## Deploy ke server
 
-## 🌟 Features
+Prasyarat: Docker dengan plugin `docker compose`, `git`, `curl`, dan RAM minimal ±4 GB (untuk build frontend).
 
-- **Work Items**
-  Efficiently create and manage tasks with a robust rich text editor that supports file uploads. Enhance organization and tracking by adding sub-properties and referencing related issues.
+```bash
+git clone git@github.com:mersifarma/plane.git && cd plane
+```
 
-- **Cycles**
-  Maintain your team’s momentum with Cycles. Track progress effortlessly using burn-down charts and other insightful tools.
+### 1. Database
 
-- **Modules**
-  Simplify complex projects by dividing them into smaller, manageable modules.
+Di host database:
 
-- **Views**
-  Customize your workflow by creating filters to display only the most relevant issues. Save and share these views with ease.
+```bash
+bash deploy.sh db
+```
 
-- **Pages**
-  Capture and organize ideas using Plane Pages, complete with AI capabilities and a rich text editor. Format text, insert images, add hyperlinks, or convert your notes into actionable items.
+Perintah ini membuat `db.env` dengan password acak lalu menjalankan Postgres 15 di port **5341**. Output-nya berisi `PGHOST` dan `POSTGRES_*` untuk disalin ke `plane.env`. Isi `DB_BIND` di `db.env` dengan IP privat, atau batasi port 5341 lewat firewall supaya hanya server aplikasi yang bisa mengakses.
 
-- **Analytics**
-  Access real-time insights across all your Plane data. Visualize trends, remove blockers, and keep your projects moving forward.
+### 2. Aplikasi
 
-## 🛠️ Local development
+```bash
+bash deploy.sh      # run pertama: membuat plane.env dengan secret baru, lalu berhenti
+nano plane.env      # isi nilai di tabel bawah
+bash deploy.sh      # git pull, build image, jalankan, lalu cek kesehatan dan storage
+```
 
-See [CONTRIBUTING](./CONTRIBUTING.md)
+| Variabel                                                                       | Isi                                                            |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `APP_DOMAIN`                                                                   | Hostname publik di Cloudflare, tanpa `https://` dan tanpa port |
+| `APP_LAN_ADDRESS`                                                              | IP LAN server aplikasi (terdeteksi otomatis)                   |
+| `LISTEN_HTTP_PORT`                                                             | `2028`, satu-satunya port yang dibuka (tidak ada 443)          |
+| `PGHOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Dari output `bash deploy.sh db`                                |
+| `USE_MINIO`                                                                    | `1` (file dilayani lewat proxy Plane)                          |
+| `AWS_S3_ENDPOINT_URL`                                                          | Alamat LAN MinIO, misalnya `http://<ip-minio>:<port>`          |
+| `AWS_S3_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`             | Bucket dan kredensial MinIO                                    |
 
-## ⚙️ Built with
+`WEB_URL` dan `CORS_ALLOWED_ORIGINS` sudah diisi otomatis dari `APP_DOMAIN`, `APP_LAN_ADDRESS`, dan port.
 
-[![React Router](https://img.shields.io/badge/-React%20Router-CA4245?logo=react-router&style=for-the-badge&logoColor=white)](https://reactrouter.com/)
-[![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=green)](https://www.djangoproject.com/)
-[![Node JS](https://img.shields.io/badge/node.js-339933?style=for-the-badge&logo=Node.js&logoColor=white)](https://nodejs.org/en)
+**Update:** cukup jalankan `bash deploy.sh` lagi.
 
-## 📸 Screenshots
+**Cloudflare Tunnel:** buat public hostname `<APP_DOMAIN>` → service `http://localhost:2028` (atau IP server aplikasi).
 
-  <p>
-    <a href="https://plane.so" target="_blank">
-      <img
-        src="https://media.docs.plane.so/GitHub-readme/github-work-items.webp"
-        alt="Plane Views"
-        width="100%"
-      />
-    </a>
-  </p>
-  <p>
-    <a href="https://plane.so" target="_blank">
-      <img
-        src="https://media.docs.plane.so/GitHub-readme/github-cycles.webp"
-        width="100%"
-      />
-    </a>
-  </p>
-  <p>
-    <a href="https://plane.so" target="_blank">
-      <img
-        src="https://media.docs.plane.so/GitHub-readme/github-modules.webp"
-        alt="Plane Cycles and Modules"
-        width="100%"
-      />
-    </a>
-  </p>
-  <p>
-    <a href="https://plane.so" target="_blank">
-      <img
-        src="https://media.docs.plane.so/GitHub-readme/github-views.webp"
-        alt="Plane Analytics"
-        width="100%"
-      />
-    </a>
-  </p>
-   <p>
-    <a href="https://plane.so" target="_blank">
-      <img
-        src="https://media.docs.plane.so/GitHub-readme/github-analytics.webp"
-        alt="Plane Pages"
-        width="100%"
-      />
-    </a>
-  </p>
-</p>
+### Hal yang perlu diperhatikan
 
-## 📝 Documentation
+- **Jangan buat workspace dengan slug sama dengan nama bucket**, karena URL-nya akan diteruskan ke MinIO.
+- **Subnet Docker bentrok dengan LAN:** kalau container timeout saat menghubungi database atau MinIO, cek apakah ada jaringan Docker yang memakai rentang IP LAN, misalnya `192.168.0.0/20`:
+  ```bash
+  docker network ls -q | xargs docker network inspect -f '{{.Name}} {{range .IPAM.Config}}{{.Subnet}}{{end}}'
+  ```
+- **Ganti password database** (setelah database pernah dijalankan, mengubah `db.env` saja tidak cukup):
+  ```bash
+  docker exec plane-db-plane-db-1 psql -U plane -c "ALTER USER plane PASSWORD '<baru>'"
+  ```
+  Lalu samakan `POSTGRES_PASSWORD` di `db.env` dan `plane.env`, dan jalankan `bash deploy.sh`.
+- **Log API:** `docker compose -p plane-server logs --tail 100 api`
 
-Explore Plane's [product documentation](https://docs.plane.so/) and [developer documentation](https://developers.plane.so/) to learn about features, setup, and usage.
+## Pengembangan lokal
 
-## ❤️ Community
+Butuh Node ≥ 22, Docker Desktop, dan pnpm 11.10.0. Node 26 tidak lagi membawa corepack, jadi pasang pnpm dengan `npm i -g pnpm@11.10.0`.
 
-Join the Plane community on our [Forum](https://forum.plane.so), and use [GitHub issues](https://github.com/makeplane/plane/issues) for bug reports and feature requests. We follow a [Code of conduct](./CODE_OF_CONDUCT.md) in all our community channels.
+```bash
+bash setup.sh                                        # buat .env + pnpm install (error corepack boleh diabaikan)
+docker compose -f docker-compose-local.yml up -d     # API, database, redis, rabbitmq, minio
+pnpm dev                                             # web, admin, space
+cd apps/live && node --env-file=.env .               # live server (di Windows tidak ikut start lewat pnpm dev)
+```
 
-Feel free to ask questions, report bugs, participate in discussions, share ideas, request features, or showcase your projects. We’d love to hear from you!
+| App   | URL                               |
+| ----- | --------------------------------- |
+| Web   | http://localhost:3000             |
+| Admin | http://localhost:3001/god-mode/   |
+| Space | http://localhost:3002/spaces/     |
+| API   | http://localhost:8000             |
+| Live  | http://localhost:3100/live/health |
 
-## 🛡️ Security
+- Pengaturan storage lokal ada di `.env` root saja (kredensial, bucket, endpoint). Compose meneruskannya ke API dan worker.
+- **Windows:** `packages/i18n/locales` adalah symlink yang di Windows ter-checkout sebagai file teks, sehingga label tampil sebagai key mentah (`issue.new`). Perbaiki sekali setelah clone (PowerShell):
+  ```powershell
+  Remove-Item packages\i18n\locales
+  New-Item -ItemType Junction -Path packages\i18n\locales -Target "$PWD\packages\i18n\src\locales"
+  git update-index --skip-worktree packages/i18n/locales
+  ```
+- **Jangan jalankan `turbo build`/`check:types` saat `pnpm dev` aktif**, karena keduanya menulis `packages/*/dist` bersamaan dan Vite akan error `Failed to load url ... .js`. Kalau terjadi, matikan semua proses dev lalu jalankan ulang.
+- Test backend: `docker compose -f docker-compose-local.yml exec api python -m pytest plane/tests/unit`
 
-If you discover a security vulnerability in Plane, please report it responsibly instead of opening a public issue. We take all legitimate reports seriously and will investigate them promptly. See [Security policy](./SECURITY.md) for more info.
+## Sinkron dengan Plane upstream
 
-To disclose any security issues, please [report them privately on GitHub](https://github.com/makeplane/plane/security/advisories/new) or email us at security@plane.so.
+```bash
+git remote add upstream https://github.com/makeplane/plane.git
+git fetch upstream preview --no-tags
+git merge upstream/preview      # selesaikan konflik di file yang ada di "Perbedaan dari upstream"
+git push
+```
 
-## 🤝 Contributing
+Ambil branch `preview` saja. Upstream punya branch yang namanya hanya beda huruf besar/kecil, dan itu bentrok di Windows kalau semua branch di-fetch.
 
-There are many ways you can contribute to Plane:
+## Migrasi dari ClickUp
 
-- Report [bugs](https://github.com/makeplane/plane/issues/new?template=--bug-report.yaml) or submit [feature requests](https://github.com/makeplane/plane/issues/new?template=--feature-request.yaml).
-- Review the [documentation](https://docs.plane.so/) and tell us on the [Forum](https://forum.plane.so) or in a GitHub issue where it is wrong or incomplete.
-- Add or update [translations](./CONTRIBUTING.md#contributing-to-language-support).
-- Talk or write about Plane or any other ecosystem integration and [let us know](https://forum.plane.so)!
-- Show your support by upvoting [popular feature requests](https://github.com/makeplane/plane/issues).
+Data ClickUp (5 space, 361 task, komentar, dan link lampiran) sudah dimigrasi pada November 2026. Skrip dan data migrasinya tidak disimpan di repo ini karena berisi data internal.
 
-Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for details on the process for submitting pull requests to us.
+## Lisensi
 
-### Repo activity
-
-![Plane Repo Activity](https://repobeats.axiom.co/api/embed/2523c6ed2f77c082b7908c33e2ab208981d76c39.svg "Repobeats analytics image")
-
-### We couldn't have done this without you.
-
-<a href="https://github.com/makeplane/plane/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=makeplane/plane" />
-</a>
-
-## License
-
-This project is licensed under the [GNU Affero General Public License v3.0](./LICENSE.txt).
+[AGPL-3.0](LICENSE.txt), sama dengan Plane. Karena Plane ini dijalankan sebagai layanan jaringan, source code beserta modifikasinya harus tersedia bagi penggunanya. Repo publik ini memenuhi syarat itu.
