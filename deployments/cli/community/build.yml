@@ -34,6 +34,10 @@ services:
     build:
       context: ../../apps/proxy
       dockerfile: Dockerfile.ce
+    environment:
+      # /<bucket>/* goes to the MinIO the API uses; with USE_MINIO=1 files are served through this proxy,
+      # on whichever address (LAN or public domain) the user opened Plane with
+      MINIO_UPSTREAM: ${AWS_S3_ENDPOINT_URL:-http://plane-minio:9000}
     # HTTP only: TLS ends in front of Plane (Cloudflare Tunnel), so 443 is not published
     ports: !override
       - target: 80

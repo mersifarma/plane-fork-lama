@@ -41,19 +41,25 @@ if [ ! -f "$ENV_FILE" ]; then
   setenv AWS_ACCESS_KEY_ID "$(rand 20)"
   setenv AWS_SECRET_ACCESS_KEY "$(rand 40)"
   setenv LISTEN_HTTP_PORT 2028
-  # users come in through Cloudflare Tunnel (https, no port) -> the tunnel forwards to http://<this host>:2028
+  # Hybrid access: https://APP_DOMAIN through Cloudflare Tunnel and plain http://APP_LAN_ADDRESS:2028 on the LAN,
+  # both listed as origins; logins send users back to whichever one they came in on.
+  sed -i "/^APP_DOMAIN=/a APP_LAN_ADDRESS=$(hostname -I 2> /dev/null | awk '{print $1}')" "$ENV_FILE"
   setenv WEB_URL 'https://${APP_DOMAIN}'
-  setenv CORS_ALLOWED_ORIGINS 'https://${APP_DOMAIN}'
+  setenv CORS_ALLOWED_ORIGINS 'https://${APP_DOMAIN},http://${APP_LAN_ADDRESS}:${LISTEN_HTTP_PORT}'
   cat << EOF
 Created $ENV_FILE with fresh secrets. Edit it, then run 'bash deploy.sh' again:
   APP_DOMAIN          public hostname in Cloudflare (e.g. plane.example.com), no scheme or port
-  LISTEN_HTTP_PORT    port the tunnel forwards to (set to 2028; only HTTP is published, TLS is Cloudflare's)
-  Own MinIO / S3:     USE_MINIO=0, AWS_S3_ENDPOINT_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET_NAME
-                      (the endpoint must be reachable from this server AND from users' browsers)
+  APP_LAN_ADDRESS     this server's LAN IP (detected: $(getenv APP_LAN_ADDRESS)); Plane also answers on http://<it>:2028
+  LISTEN_HTTP_PORT    port for LAN users and for the tunnel (2028; only HTTP is published, TLS is Cloudflare's)
+  Own MinIO:          keep USE_MINIO=1, set AWS_S3_ENDPOINT_URL to MinIO's LAN address (e.g. http://192.168.1.17:9002)
+                      plus AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET_NAME; files are served through
+                      Plane's own address, so no workspace may use the bucket name as its URL slug
   Separate database:  run 'bash deploy.sh db' on the DB host, then copy PGHOST and POSTGRES_* here
 EOF
   exit 1
 fi
+
+setenv AWS_S3_ENDPOINT_URL "$(getenv AWS_S3_ENDPOINT_URL | sed 's|/*$||')" # the proxy rejects an upstream with a path
 
 git pull --ff-only
 compose build
