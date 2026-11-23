@@ -34,6 +34,12 @@ services:
     build:
       context: ../../apps/proxy
       dockerfile: Dockerfile.ce
+    # HTTP only: TLS ends in front of Plane (Cloudflare Tunnel), so 443 is not published
+    ports: !override
+      - target: 80
+        published: ${LISTEN_HTTP_PORT:-80}
+        protocol: tcp
+        mode: host
 
   # same backend image as api, so they run this checkout's code instead of pulling makeplane/plane-backend
   worker:

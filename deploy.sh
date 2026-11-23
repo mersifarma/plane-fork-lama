@@ -41,13 +41,13 @@ if [ ! -f "$ENV_FILE" ]; then
   setenv AWS_ACCESS_KEY_ID "$(rand 20)"
   setenv AWS_SECRET_ACCESS_KEY "$(rand 40)"
   setenv LISTEN_HTTP_PORT 2028
-  # browsers drop :80 from Origin, so if LISTEN_HTTP_PORT becomes 80, drop the :port from these two
-  setenv WEB_URL 'http://${APP_DOMAIN}:${LISTEN_HTTP_PORT}'
-  setenv CORS_ALLOWED_ORIGINS 'http://${APP_DOMAIN}:${LISTEN_HTTP_PORT}'
+  # users come in through Cloudflare Tunnel (https, no port) -> the tunnel forwards to http://<this host>:2028
+  setenv WEB_URL 'https://${APP_DOMAIN}'
+  setenv CORS_ALLOWED_ORIGINS 'https://${APP_DOMAIN}'
   cat << EOF
 Created $ENV_FILE with fresh secrets. Edit it, then run 'bash deploy.sh' again:
-  APP_DOMAIN          domain or IP users open in the browser, without port
-  LISTEN_HTTP_PORT    host port for the web UI (set to 2028)
+  APP_DOMAIN          public hostname in Cloudflare (e.g. plane.example.com), no scheme or port
+  LISTEN_HTTP_PORT    port the tunnel forwards to (set to 2028; only HTTP is published, TLS is Cloudflare's)
   Own MinIO / S3:     USE_MINIO=0, AWS_S3_ENDPOINT_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET_NAME
                       (the endpoint must be reachable from this server AND from users' browsers)
   Separate database:  run 'bash deploy.sh db' on the DB host, then copy PGHOST and POSTGRES_* here
